@@ -29,6 +29,39 @@ logger = logging.getLogger("server")
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(log_level)
 
+html_header = \
+    """
+    <html>
+        <head>
+            <title>CoverGAN</title>
+        </head>
+        <body>
+    """
+
+html_footer = \
+    """
+        </body>
+    </html>
+    """
+
+html_body = \
+    """
+    <p>
+    <form action="generate" method="post" enctype="multipart/form-data">
+        <div style="width: 45%;float:left;">
+            <img id="result" style="width: 100%;height: 90%;float:left;" src="${result_image}" alt="upload your track to generate cover">
+        </div>
+        <div style="width: 45%;float:right;">
+        <input type="file" name="audio_file">  <br>
+        <input type="text" name="track_artist">  <br>
+        <input type="text" name="track_name">  <br>
+        <input type="text" name="emotion">  <br>
+        <input type="submit" value="Upload" name="submit">
+        </div>
+    </form>
+    </p>
+    """
+
 
 def base64_encode(img):
     return base64.b64encode(img).decode('utf-8')
@@ -61,15 +94,16 @@ def process_generate_request(tmp_filename: str,
     # Execute the actual heavy computation in a process pool to escape GIL
     result = process_pool.apply(do_generate, (tmp_filename, track_artist, track_name, emotions, rasterize))
     os.remove(tmp_filename)
-    if rasterize:
-        result = list(map(lambda x: {"svg": x[0], "base64": base64_encode(x[1])}, result))
-    else:
-        result = list(map(lambda x: {"svg": x}, result))
+    # if rasterize:
+    #     result = list(map(lambda x: {"svg": x[0], "base64": base64_encode(x[1])}, result))
+    # else:
+    #     result = list(map(lambda x: {"svg": x}, result))
 
     time_spent = time.time() - start
     log("Completed api call.Time spent {0:.3f} s".format(time_spent))
 
-    return result
+    # return result
+    return list(map(lambda x: x[0], result))
 
 
 class ApiServerController(object):
@@ -107,18 +141,21 @@ class ApiServerController(object):
                     break
                 f.write(data)
 
-        return process_generate_request(
+        generated = process_generate_request(
             tmp_filename,
             track_artist, track_name,
             [emotion]
         )
+
+        return html_header + \
+               html_body.replace("${result_image}", "data:image/svg+xml " + generated[0]) + html_footer
 
 
 if __name__ == '__main__':
     freeze_support()
     cherrypy.tree.mount(ApiServerController(), '/')
 
-    cherrypy.init_func_types_config.update({
+    cherrypy.config.update({
         'server.socket_port': config["app"]["port"],
         'server.socket_host': config["app"]["host"],
         'server.thread_pool': config["app"]["thread_pool"],

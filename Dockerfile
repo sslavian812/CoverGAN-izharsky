@@ -57,6 +57,8 @@ WORKDIR /inference-api/covergan
 COPY ./gen.py ./gen.py
 COPY ./server.py ./server.py
 COPY ./config.yml ./config.yml
+COPY ./fonts_cfg.py ./fonts_cfg.py
+COPY ./service_utils.py ./service_utils.py
 
 
 # Run the processes
